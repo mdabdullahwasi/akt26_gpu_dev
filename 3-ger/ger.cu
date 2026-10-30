@@ -15,6 +15,15 @@
 __global__ void ger_kernel(int m, int n, float alpha, const float* x, const float* y, float* A)
 {
     // TODO: write your CUDA kernel here
+    // Each thread updates one matrix element.
+    // Adjacent threads in x access adjacent rows in column-major storage.
+    const size_t i = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
+    const size_t j = (size_t)blockIdx.y * blockDim.y + threadIdx.y;
+
+    // Edge blocks can contain threads outside the matrix.
+    if (i < (size_t)m && j < (size_t)n) {
+        A[j * (size_t)m + i] += alpha * x[i] * y[j];
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -107,8 +116,11 @@ int main(int argc, char** argv)
 
     // n1000: configure your kernel here
     // TODO: the configuration below is a default that you must change
-    dim3 block(16, 16, 1);
-    dim3 grid( 1, 1, 1);
+    // 256 threads per block; one warp spans 32 consecutive rows.
+    dim3 block(32, 8, 1);
+    // Round up so the grid covers every row and column.
+    dim3 grid((m + block.x - 1) / block.x,
+              (n + block.y - 1) / block.y, 1);
     // end of TODO: kernel configuration
 
     cudaEvent_t start, stop;
